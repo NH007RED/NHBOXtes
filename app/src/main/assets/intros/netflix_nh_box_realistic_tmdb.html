@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NH BOX - Netflix Spectrum Pull-Back & Letter-by-Letter Draw Intro (Ultra HD)</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#030305; --panel:#0c0d14; --border:#222638; --red:#E50914; --text:#F5F7FA; --muted:#8E9BAE; box-sizing:border-box; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:16px 14px 36px; }
+.wrap { width:100%; max-width:1120px; display:flex; flex-direction:column; gap:12px; }
+.header { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
+.title-group h1 { font-size:21px; font-weight:900; display:flex; align-items:center; gap:10px; }
+.badge { background:#E50914; color:#fff; font-size:11px; padding:3px 9px; border-radius:4px; letter-spacing:1px; box-shadow:0 0 14px rgba(229,9,20,0.55); }
+.desc { color:var(--muted); font-size:12.5px; margin-top:3px; }
+.canvas-holder { width:100%; background:#000; border-radius:12px; overflow:hidden; border:1px solid var(--border); box-shadow:0 20px 60px rgba(0,0,0,0.92), 0 0 45px rgba(229,9,20,0.2); }
+canvas#cv { width:100%; height:auto; aspect-ratio:16/9; display:block; background:#000; }
+.controls-bar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; background:var(--panel); border:1px solid var(--border); padding:10px 14px; border-radius:10px; }
+.btn-cluster, .toggles { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+button, select { font:600 12.5px inherit; padding:8px 13px; border-radius:7px; border:1px solid #2d334a; background:#141826; color:#fff; cursor:pointer; }
+button.primary { background:linear-gradient(135deg,#E50914,#99060D); border-color:#FF424B; }
+.toggles label { font-size:12px; color:var(--muted); display:flex; align-items:center; gap:5px; cursor:pointer; }
+.status-bar { display:flex; justify-content:space-between; font:12px ui-monospace,monospace; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div class="title-group">
+      <h1>NH BOX <span class="badge">NETFLIX SPECTRUM + LETTER-BY-LETTER DRAW EDITION</span></h1>
+      <p class="desc">Red Laser Beam -> Diagonal Rainbow Spectrum Pull-Back -> 3D Ribbon 'N' -> Animated Letter-by-Letter Laser Stroke Draw ("N-H-B-O-X" ek-ek akshar draw hokar likhta hai)!</p>
+    </div>
+  </div>
+  <div class="canvas-holder"><canvas id="cv" width="1920" height="1080"></canvas></div>
+  <div class="controls-bar">
+    <div class="btn-cluster">
+      <button id="pv" class="primary">▶ Preview Chalao</button>
+      <button id="btnReplay">⟲ Replay Letter Draw</button>
+      <select id="scSel"></select>
+      <button id="btnFs">⛶ Fullscreen</button>
+    </div>
+    <div class="toggles">
+      <label><input type="checkbox" id="cap" checked> Subtitles</label>
+      <label><input type="checkbox" id="sf" checked> "Ta-Dum" &amp; Laser Draw SFX</label>
+      <button id="dl">⬇ SFX Track (WAV)</button>
+    </div>
+  </div>
+  <div class="status-bar">
+    <span id="st">Status: Ready. Click Preview.</span>
+    <span id="timing">0.00s / 9.20s [60 FPS]</span>
+  </div>
+</div>
+
+<script>
+/* ==========================================================================
+   1. HTML2VIDEO BRIDGE CONTRACT & TIMELINE (9.20s)
+   ========================================================================== */
+var BRAND_TEXT = "NH BOX";
+var SC = [
+  { "min": 4.4, "vo": "NH BOX Originals presents..." },
+  { "min": 4.8, "vo": "Ta-dum! Experience cinema on NH BOX." }
+];
+var S = SC;
+
+var cv = document.getElementById("cv"), c = cv.getContext("2d");
+var W = 1920, H = 1080, CX = 960, CY = 540;
+var cl = function(v, a, b) { return v < a ? a : v > b ? b : v; };
+var seg = function(t, a, b) { return cl((t - a) / (b - a), 0, 1); };
+var easeOutCubic = function(t) { t = cl(t, 0, 1); return 1 - Math.pow(1 - t, 3); };
+var easeInOutCubic = function(t) { t = cl(t, 0, 1); return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2; };
+var easeOutBack = function(t) {
+  t = cl(t, 0, 1);
+  var c1 = 1.70158, c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+};
+
+var DUR = null, PLAN = [], TOTAL = 9.2;
+function buildPlan() {
+  PLAN = [
+    { i: 0, start: 0.0, len: 4.4, vd: 3.4, vs: 0.3 },
+    { i: 1, start: 4.4, len: 4.8, vd: 3.8, vs: 0.3 }
+  ];
+  TOTAL = 9.2;
+}
+buildPlan();
+
+var NH = {
+  lang: "hi-IN",
+  narration: function() { return JSON.stringify(SC.map(function(s) { return { a: s.vo, b: "" }; })); },
+  setDurations: function(j) {
+    try { DUR = typeof j === "string" ? JSON.parse(j) : j; } catch(e) {}
+    buildPlan();
+    return { total: TOTAL, events: PLAN.map(function(p, i) { return { time: p.start, scene: i, text: SC[i].vo }; }) };
+  },
+  run: function(fps) {
+    fps = fps || 60;
+    var N = Math.ceil(TOTAL * fps), n = 0;
+    function step() {
+      if (n >= N) { if (window.Android && window.Android.done) window.Android.done(); return; }
+      frameAt(n / fps);
+      if (window.Android && window.Android.pushFrame) {
+        try { window.Android.pushFrame(cv.toDataURL("image/jpeg", 0.92)); } catch(e) {}
+      }
+      if (window.Android && window.Android.progress) window.Android.progress(n, N);
+      n++;
+      requestAnimationFrame(step);
+    }
+    step();
+  }
+};
+window.NH = NH;
+window.bedSched = function() {};
+
+/* ==========================================================================
+   2. WEBAUDIO "TA-DUM" + SPECTRUM + PER-LETTER LASER DRAW SFX
+   ========================================================================== */
+var actx = null;
+function getAudioContext() {
+  if (!actx) { var AC = window.AudioContext || window.webkitAudioContext; if (AC) actx = new AC(); }
+  if (actx && actx.state === "suspended") actx.resume();
+  return actx;
+}
+
+function scheduleNetflixAudio(ctx, baseTime) {
+  var master = ctx.createGain();
+  master.gain.setValueAtTime(0.92, baseTime);
+  master.connect(ctx.destination);
+
+  var comp = ctx.createDynamicsCompressor();
+  comp.threshold.setValueAtTime(-12, baseTime);
+  comp.ratio.setValueAtTime(6, baseTime);
+  comp.connect(master);
+
+  var nBuf = ctx.createBuffer(1, ctx.sampleRate * 5.0, ctx.sampleRate);
+  var nd = nBuf.getChannelData(0);
+  for (var i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+
+  // 1. Opening Prism Spectrum Shimmer & Whoosh (0.15s -> 4.30s)
+  var spW = ctx.createBufferSource(); spW.buffer = nBuf;
+  var spF = ctx.createBiquadFilter(); spF.type = "bandpass"; spF.Q.setValueAtTime(4.0, baseTime + 0.15);
+  spF.frequency.setValueAtTime(320, baseTime + 0.15);
+  spF.frequency.exponentialRampToValueAtTime(3400, baseTime + 2.10);
+  spF.frequency.exponentialRampToValueAtTime(420, baseTime + 4.35);
+  var spG = ctx.createGain();
+  spG.gain.setValueAtTime(0.0001, baseTime + 0.15);
+  spG.gain.linearRampToValueAtTime(0.30, baseTime + 1.90);
+  spG.gain.exponentialRampToValueAtTime(0.0001, baseTime + 4.40);
+  spW.connect(spF); spF.connect(spG); spG.connect(comp);
+  spW.start(baseTime + 0.15, 0, 4.3);
+
+  [220.0, 329.63, 440.0, 554.37, 659.25].forEach(function(freq, idx) {
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = "triangle"; o.frequency.setValueAtTime(freq, baseTime + 0.35);
+    g.gain.setValueAtTime(0.0001, baseTime + 0.35);
+    g.gain.linearRampToValueAtTime(0.055 / (1 + idx * 0.2), baseTime + 1.7);
+    g.gain.exponentialRampToValueAtTime(0.0001, baseTime + 4.2);
+    o.connect(g); g.connect(comp);
+    o.start(baseTime + 0.35); o.stop(baseTime + 4.3);
+  });
+
+  // 2. "TA-DUM!" Impact as Spectrum Compresses into the 3D Red 'N' (4.15s & 4.42s)
+  var tTa = baseTime + 4.15, tDum = baseTime + 4.42;
+  var taSub = ctx.createOscillator(), taG = ctx.createGain();
+  taSub.type = "sine"; taSub.frequency.setValueAtTime(118, tTa);
+  taSub.frequency.exponentialRampToValueAtTime(48, tTa + 0.14);
+  taG.gain.setValueAtTime(0.75, tTa);
+  taG.gain.exponentialRampToValueAtTime(0.001, tTa + 0.20);
+  taSub.connect(taG); taG.connect(comp);
+  taSub.start(tTa); taSub.stop(tTa + 0.22);
+
+  var dumSub = ctx.createOscillator(), dumSG = ctx.createGain();
+  dumSub.type = "sine"; dumSub.frequency.setValueAtTime(128, tDum);
+  dumSub.frequency.exponentialRampToValueAtTime(36.7, tDum + 0.24);
+  dumSG.gain.setValueAtTime(1.0, tDum);
+  dumSG.gain.exponentialRampToValueAtTime(0.0001, tDum + 3.8);
+  dumSub.connect(dumSG); dumSG.connect(comp);
+  dumSub.start(tDum); dumSub.stop(tDum + 3.9);
+
+  [73.42, 110.00, 146.83, 185.00, 220.00, 329.63].forEach(function(freq, idx) {
+    var osc = ctx.createOscillator(), flt = ctx.createBiquadFilter(), g = ctx.createGain();
+    osc.type = idx < 2 ? "sawtooth" : "triangle";
+    osc.frequency.setValueAtTime(freq, tDum);
+    flt.type = "lowpass"; flt.frequency.setValueAtTime(1800, tDum);
+    flt.frequency.exponentialRampToValueAtTime(380, tDum + 3.4);
+    g.gain.setValueAtTime(0.0001, tDum);
+    g.gain.linearRampToValueAtTime(0.15 / (1 + idx * 0.25), tDum + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001, tDum + 3.6);
+    osc.connect(flt); flt.connect(g); g.connect(comp);
+    osc.start(tDum); osc.stop(tDum + 3.7);
+  });
+
+  // 3. Per-Letter Laser Pen Stroke Draw Sizzle & Chime Cues (5.35s -> 7.55s)
+  // 5 letters ("N", "H", "B", "O", "X") each get a crisp laser-draw swoosh + crystalline lock chime!
+  var letterPitches = [587.33, 659.25, 739.99, 880.00, 1174.66]; // D5, E5, F#5, A5, D6
+  for (var L = 0; L < 5; L++) {
+    var tL = baseTime + 5.35 + L * 0.42;
+    // Laser stroke whoosh
+    var lw = ctx.createBufferSource(); lw.buffer = nBuf;
+    var lf = ctx.createBiquadFilter(); lf.type = "bandpass"; lf.Q.setValueAtTime(6.0, tL);
+    lf.frequency.setValueAtTime(900 + L * 250, tL);
+    lf.frequency.exponentialRampToValueAtTime(2800 + L * 300, tL + 0.36);
+    var lg = ctx.createGain();
+    lg.gain.setValueAtTime(0.0001, tL);
+    lg.gain.linearRampToValueAtTime(0.16, tL + 0.12);
+    lg.gain.exponentialRampToValueAtTime(0.0001, tL + 0.38);
+    lw.connect(lf); lf.connect(lg); lg.connect(comp);
+    lw.start(tL, L * 0.3, 0.40);
+
+    // Subtle harmonic lock-in bell when each letter finishes drawing
+    var bo = ctx.createOscillator(), bg = ctx.createGain();
+    bo.type = "sine";
+    bo.frequency.setValueAtTime(letterPitches[L], tL + 0.28);
+    bg.gain.setValueAtTime(0.0001, tL + 0.28);
+    bg.gain.linearRampToValueAtTime(0.08, tL + 0.30);
+    bg.gain.exponentialRampToValueAtTime(0.0001, tL + 1.10);
+    bo.connect(bg); bg.connect(comp);
+    bo.start(tL + 0.28); bo.stop(tL + 1.15);
+  }
+}
+
+function renderSfxWav(cb) {
+  var off = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(2, Math.ceil(44100 * TOTAL), 44100);
+  scheduleNetflixAudio(off, 0);
+  off.startRendering().then(function(buf) {
+    var numOfChan = buf.numberOfChannels, len = buf.length * numOfChan * 2 + 44;
+    var out = new DataView(new ArrayBuffer(len)), ch = [], pos = 0, offset = 0;
+    function u16(d) { out.setUint16(pos, d, true); pos += 2; }
+    function u32(d) { out.setUint32(pos, d, true); pos += 4; }
+    u32(0x46464952); u32(len - 8); u32(0x45564157); u32(0x20746d66); u32(16); u16(1); u16(numOfChan);
+    u32(buf.sampleRate); u32(buf.sampleRate * 2 * numOfChan); u16(numOfChan * 2); u16(16); u32(0x61746164); u32(len - pos - 4);
+    for (var i = 0; i < numOfChan; i++) ch.push(buf.getChannelData(i));
+    while (offset < buf.length) {
+      for (var cIdx = 0; cIdx < numOfChan; cIdx++) {
+        var s = Math.max(-1, Math.min(1, ch[cIdx][offset]));
+        out.setInt16(pos, (s < 0 ? s * 32768 : s * 32767) | 0, true); pos += 2;
+      }
+      offset++;
+    }
+    cb(new Blob([out], { type: "audio/wav" }));
+  });
+}
+
+/* ==========================================================================
+   3. SPECTRUM RAYS + 3D RIBBON 'N' + LETTER-BY-LETTER LASER DRAW ENGINE
+   ========================================================================== */
+var RAYS = [];
+var PALETTE = [
+  "#E50914", "#FF1E27", "#FF5500", "#FF9900", "#FFD000",
+  "#FF0066", "#FF85B3", "#FFFFFF", "#B84DFF", "#00E5FF", "#0077FF", "#0033CC"
+];
+for (var r = 0; r < 180; r++) {
+  var u = r / 180;
+  var cIdx = Math.min(PALETTE.length - 1, Math.floor(u * PALETTE.length));
+  var s1 = Math.sin(r * 19.3) * 10000; s1 -= Math.floor(s1);
+  RAYS.push({
+    u: (u - 0.5) * 2.0,
+    col: PALETTE[cIdx],
+    w: 2.5 + s1 * 24,
+    alpha: 0.4 + s1 * 0.6
+  });
+}
+
+// Offscreen canvas for rendering the progressive Letter-by-Letter Drawn Wordmark
+// and then slice-mapping it into the authentic Netflix Parabolic Cinema Arch!
+var wordmarkCanv = document.createElement("canvas");
+wordmarkCanv.width = 1300;
+wordmarkCanv.height = 400;
+var wc = wordmarkCanv.getContext("2d");
+
+/**
+ * Renders `BRAND_TEXT` ("NH BOX") onto `wordmarkCanv` where each non-space character
+ * is progressively drawn one after another ("ek-ek akshar draw hokar likhta hai"):
+ * - Phase A (charP 0.0 -> 0.72): Glowing Neon Red/White Laser Outline traces around the character
+ *   using animated `setLineDash` while a vertical liquid-scarlet ribbon wipe fills the letter strokes!
+ * - Phase B (charP 0.72 -> 1.0): Full 3D Netflix Scarlet-to-Crimson gradient + top bevel + cast shadow
+ *   locks in with a subtle elastic pop, and a bright laser pen sparkler traces the letter!
+ */
+function renderLetterByLetterWordmark(text, drawElapsedSec) {
+  wc.clearRect(0, 0, 1300, 400);
+
+  var chars = text.split("");
+  // Filter non-space indices so spaces don't waste a drawing slot
+  var nonSpaceCount = 0;
+  for (var k = 0; k < chars.length; k++) {
+    if (chars[k] !== " ") nonSpaceCount++;
+  }
+  if (nonSpaceCount === 0) nonSpaceCount = 1;
+
+  var fontSize = 248;
+  var fontSpec = "900 " + fontSize + "px 'Bebas Neue', Impact, 'Arial Black', sans-serif";
+  wc.font = fontSpec;
+  wc.textBaseline = "middle";
+  wc.textAlign = "center";
+
+  // Measure individual character widths + tracking gap
+  var gap = 16;
+  var widths = [];
+  var totalW = 0;
+  for (var i = 0; i < chars.length; i++) {
+    var w = chars[i] === " " ? 58 : Math.max(95, wc.measureText(chars[i]).width);
+    widths.push(w);
+    totalW += w;
+  }
+  totalW += (chars.length - 1) * gap;
+
+  var startX = 650 - totalW / 2;
+  var centerY = 195;
+
+  // Total time to draw all letters sequentially = 2.15 seconds (~0.43s per letter)
+  var perLetterDur = 0.42;
+  var overlap = 0.06; // Slight natural handwriting flow between consecutive letters
+  var stepTime = perLetterDur - overlap;
+
+  var curX = startX;
+  var activeIdx = 0;
+  var activeLaserTips = [];
+
+  for (var idx = 0; idx < chars.length; idx++) {
+    var ch = chars[idx];
+    var cw = widths[idx];
+    var lx = curX + cw / 2;
+    curX += cw + gap;
+
+    if (ch === " ") continue;
+
+    var charStart = activeIdx * stepTime;
+    var charP = cl((drawElapsedSec - charStart) / perLetterDur, 0, 1);
+    activeIdx++;
+
+    if (charP <= 0.001) continue;
+
+    // 1. Progressive Ribbon Fill Progress (starts slightly after laser outline begins tracing)
+    var fillP = easeInOutCubic(cl((charP - 0.15) / 0.85, 0, 1));
+    // Subtle pop scale as the letter finishes drawing
+    var popScale = charP < 0.85 ? (0.92 + 0.08 * (charP / 0.85)) : (1.0 + Math.sin(((charP - 0.85) / 0.15) * Math.PI) * 0.06);
+
+    wc.save();
+    wc.translate(lx, centerY);
+    wc.scale(popScale, popScale);
+
+    // --- PASS A: PROGRESSIVE 3D SCARLET RIBBON FILL (Revealed via diagonal/vertical stroke wipe) ---
+    if (fillP > 0.01) {
+      wc.save();
+      // Diagonal sweep clip from top-left to bottom-right of the letter (mimics hand-drawn brush/ribbon stroke!)
+      wc.beginPath();
+      var clipH = (fontSize * 1.15) * fillP;
+      wc.rect(-cw, -fontSize * 0.58, cw * 2, clipH);
+      wc.clip();
+
+      // 3D Deep Cast Shadow behind the letter
+      wc.shadowColor = "rgba(0, 0, 0, 0.85)";
+      wc.shadowBlur = 22;
+      wc.shadowOffsetX = 3;
+      wc.shadowOffsetY = 8;
+
+      var grad = wc.createLinearGradient(0, -fontSize * 0.5, 0, fontSize * 0.5);
+      grad.addColorStop(0.0, "#FF2A34");
+      grad.addColorStop(0.28, "#E50914");
+      grad.addColorStop(0.82, "#B20710");
+      grad.addColorStop(1.0, "#7A0409");
+      wc.fillStyle = grad;
+      wc.fillText(ch, 0, 0);
+      wc.restore();
+    }
+
+    // --- PASS B: ANIMATED LASER STROKE OUTLINE TRACE (`setLineDash` self-drawing contour!) ---
+    var strokeTraceP = easeOutCubic(cl(charP / 0.88, 0, 1));
+    var dashLen = 950;
+    wc.save();
+    wc.setLineDash([dashLen * strokeTraceP, dashLen]);
+    wc.lineDashOffset = 0;
+    wc.lineJoin = "round";
+    wc.lineCap = "round";
+
+    // Outer neon crimson-gold laser glow while actively drawing, settling into a sleek 3D bevel rim
+    var glowFade = charP < 0.90 ? 1.0 : Math.max(0.25, 1.0 - (charP - 0.90) * 7.5);
+    wc.shadowColor = charP < 0.85 ? "#FF3842" : "#E50914";
+    wc.shadowBlur = 26 * glowFade;
+    wc.strokeStyle = charP < 0.85 ? "#FFF0F2" : "rgba(255, 150, 155, 0.65)";
+    wc.lineWidth = charP < 0.85 ? 5.5 : 2.4;
+    wc.strokeText(ch, 0, 0);
+    wc.restore();
+
+    wc.restore();
+
+    // Record the active laser pen tip coordinates if this character is currently being drawn (0.02 < charP < 0.96)
+    if (charP > 0.02 && charP < 0.96) {
+      // Trace a realistic figure-8 / letter-stroke pen path over the character bounding box
+      var penAngle = charP * Math.PI * 2.2 - Math.PI * 0.5;
+      var tipX = lx + Math.sin(penAngle) * (cw * 0.34);
+      var tipY = (centerY - fontSize * 0.42) + charP * (fontSize * 0.84);
+      activeLaserTips.push({ x: tipX, y: tipY, p: charP });
+    }
+  }
+
+  return activeLaserTips;
+}
+
+function drawRibbonNAndWordmark(T) {
+  c.fillStyle = "#020308";
+  c.fillRect(0, 0, W, H);
+
+  // STAGE 1 (0.0s -> 1.15s): Single Thin Glowing Red Vertical Laser Line Ignites from Bottom to Top
+  if (T < 1.35) {
+    var lineH = easeOutCubic(seg(T, 0.05, 0.95)) * H;
+    var expandP = seg(T, 0.85, 1.35);
+    c.save();
+    c.shadowColor = "#E50914";
+    c.shadowBlur = 35;
+    c.fillStyle = "#FF1E27";
+    var w = 5 + expandP * 60;
+    c.fillRect(CX - w / 2, H - lineH, w, lineH);
+    c.restore();
+  }
+
+  // STAGE 2 (0.95s -> 4.55s): Diagonal Rainbow Fiber-Optic Spectrum Fan-Out & Pull-Back into Verticals
+  if (T >= 0.95 && T < 4.75) {
+    var fanIn = easeOutCubic(seg(T, 0.95, 1.80));
+    var straightenP = easeInOutCubic(seg(T, 1.80, 3.35));
+    var compressToNP = easeInOutCubic(seg(T, 3.25, 4.45));
+    var fadeToSolidN = 1 - seg(T, 4.25, 4.72);
+
+    c.save();
+    c.globalCompositeOperation = "screen";
+
+    var nHalfW = 115;
+    for (var i = 0; i < RAYS.length; i++) {
+      var ray = RAYS[i];
+      var spreadW = (W * 0.85) * (1 - compressToNP) + (nHalfW * 2.0) * compressToNP;
+      var baseX = CX + ray.u * (spreadW * 0.5) * fanIn;
+
+      var coneTilt = (1 - straightenP) * (ray.u * -480 + 320 * Math.sin(seg(T, 1.2, 2.7) * Math.PI));
+      var topX = baseX + coneTilt;
+      var botX = baseX - coneTilt * 0.65;
+
+      var curHalfH = (H * 0.65) * (1 - compressToNP * 0.68) + 180 * (compressToNP * 0.68);
+      var col = compressToNP > 0.65 ? "#E50914" : ray.col;
+      var lw = ray.w * (1 - compressToNP * 0.55);
+
+      var grad = c.createLinearGradient(topX, CY - curHalfH, botX, CY + curHalfH);
+      grad.addColorStop(0.0, "rgba(0,0,0,0)");
+      grad.addColorStop(0.18, col);
+      grad.addColorStop(0.50, compressToNP > 0.7 ? "#FF2A32" : "#FFFFFF");
+      grad.addColorStop(0.82, col);
+      grad.addColorStop(1.0, "rgba(0,0,0,0)");
+
+      c.globalAlpha = cl(ray.alpha * fadeToSolidN, 0, 1);
+      c.strokeStyle = grad;
+      c.lineWidth = lw;
+      c.beginPath();
+      c.moveTo(topX, CY - curHalfH);
+      c.lineTo(botX, CY + curHalfH);
+      c.stroke();
+    }
+    c.restore();
+  }
+
+  // STAGE 3 (4.10s -> 5.50s): Solid 3D Red Ribbon 'N' Emerges from Compressed Spectrum Lines
+  if (T >= 4.10 && T < 5.55) {
+    var nIn = easeOutCubic(seg(T, 4.10, 4.55));
+    var nOut = 1 - easeInOutCubic(seg(T, 5.10, 5.52));
+    var nScale = 1.12 - 0.18 * easeOutCubic(seg(T, 4.10, 5.25));
+
+    c.save();
+    c.translate(CX, CY);
+    c.scale(nScale, nScale);
+    c.globalAlpha = cl(nIn * nOut, 0, 1);
+
+    var nW = 210, nH = 360, barW = 68;
+    var lx = -nW / 2, rx = nW / 2 - barW, ty = -nH / 2, by = nH / 2;
+
+    var gL = c.createLinearGradient(lx, by, lx, ty);
+    gL.addColorStop(0, "#750409"); gL.addColorStop(1, "#B80710");
+    c.fillStyle = gL;
+    c.fillRect(lx, ty, barW, nH);
+    c.fillRect(rx, ty, barW, nH);
+
+    c.save();
+    c.shadowColor = "rgba(0,0,0,0.88)";
+    c.shadowBlur = 30;
+    c.shadowOffsetY = 8;
+    var gD = c.createLinearGradient(lx, ty, rx + barW, by);
+    gD.addColorStop(0, "#FF242C"); gD.addColorStop(0.5, "#E50914"); gD.addColorStop(1, "#B80710");
+    c.fillStyle = gD;
+    c.beginPath();
+    c.moveTo(lx, ty); c.lineTo(lx + barW, ty);
+    c.lineTo(rx + barW, by); c.lineTo(rx, by);
+    c.closePath();
+    c.fill();
+    c.restore();
+
+    c.restore();
+  }
+
+  // STAGE 4 (5.25s -> 9.20s): LETTER-BY-LETTER LASER STROKE DRAW OF "NH BOX" ("Ek-Ek Akshar Draw Hokar Likhta Hai")!
+  if (T >= 5.25) {
+    var drawElapsed = T - 5.30;
+    var activeTips = renderLetterByLetterWordmark(BRAND_TEXT, Math.max(0, drawElapsed));
+
+    c.save();
+    c.translate(CX, CY - 18);
+    var mainScale = 0.92;
+    c.scale(mainScale, mainScale);
+
+    // Subtle red ambient studio glow behind the drawing letters
+    var ambA = cl(drawElapsed / 1.5, 0, 1);
+    var halo = c.createRadialGradient(0, 0, 20, 0, 0, 560);
+    halo.addColorStop(0.0, "rgba(229, 9, 20, " + (0.36 * ambA) + ")");
+    halo.addColorStop(0.6, "rgba(130, 5, 10, " + (0.12 * ambA) + ")");
+    halo.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+    c.fillStyle = halo;
+    c.fillRect(-650, -240, 1300, 480);
+
+    // Slice-map `wordmarkCanv` into the authentic Netflix Parabolic Cinema Arch!
+    var slices = 110;
+    var sw = wordmarkCanv.width / slices;
+    for (var s = 0; s < slices; s++) {
+      var sx = s * sw;
+      var nx = cl((sx + sw * 0.5 - 650) / 520, -1.2, 1.2);
+      var archLift = 34 * (1 - nx * nx);
+      c.drawImage(
+        wordmarkCanv,
+        sx, 0, sw + 0.9, 400,
+        sx - 650, -200, sw + 0.9, 400 - archLift
+      );
+    }
+
+    // Draw the Glowing Laser Pen Flare & Sparks at the tip of whichever letter is currently being drawn!
+    if (activeTips && activeTips.length > 0) {
+      c.save();
+      c.globalCompositeOperation = "screen";
+      activeTips.forEach(function(tip) {
+        var tx = tip.x - 650;
+        var ty = tip.y - 200;
+
+        // Intense white-red laser pen core
+        var pg = c.createRadialGradient(tx, ty, 0, tx, ty, 75);
+        pg.addColorStop(0.0, "#FFFFFF");
+        pg.addColorStop(0.22, "#FFE082");
+        pg.addColorStop(0.50, "#E50914");
+        pg.addColorStop(1.0, "rgba(229, 9, 20, 0)");
+        c.fillStyle = pg;
+        c.beginPath();
+        c.arc(tx, ty, 75, 0, Math.PI * 2);
+        c.fill();
+
+        // Horizontal optical anamorphic flare on the pen tip
+        var stG = c.createLinearGradient(tx - 160, ty, tx + 160, ty);
+        stG.addColorStop(0, "rgba(0,0,0,0)");
+        stG.addColorStop(0.5, "#FFFFFF");
+        stG.addColorStop(1, "rgba(0,0,0,0)");
+        c.fillStyle = stG;
+        c.fillRect(tx - 160, ty - 2, 320, 4);
+
+        // Flying sparks radiating from the writing tip
+        for (var sp = 0; sp < 8; sp++) {
+          var ang = sp * 0.785 + T * 14;
+          var dist = 12 + ((T * 120 + sp * 9) % 38);
+          var spX = tx + Math.cos(ang) * dist;
+          var spY = ty + Math.sin(ang) * dist;
+          c.fillStyle = sp % 2 === 0 ? "#FFF3B0" : "#FF3842";
+          c.beginPath();
+          c.arc(spX, spY, 2.6, 0, Math.PI * 2);
+          c.fill();
+        }
+      });
+      c.restore();
+    }
+
+    // Final Glossy Light Sweep across all letters after the last character 'X' finishes drawing (T >= 7.45s)
+    if (T >= 7.45) {
+      var subP = easeOutCubic(seg(T, 7.45, 8.20));
+      c.globalAlpha = subP;
+      c.font = "800 22px 'Montserrat', sans-serif";
+      c.fillStyle = "#E2E8F0";
+      c.textAlign = "center";
+      try { c.letterSpacing = "14px"; } catch(e) {}
+      c.fillText("A N   N H B O X   O R I G I N A L", 7, 175);
+    }
+
+    c.restore();
+  }
+}
+
+function frameAt(T) {
+  drawRibbonNAndWordmark(T);
+  var te = document.getElementById("timing");
+  if (te) te.textContent = T.toFixed(2) + "s / " + TOTAL.toFixed(2) + "s [60 FPS]";
+}
+
+var isPlaying = false, playStart = 0, rafId = null;
+var pvBtn = document.getElementById("pv"), replayBtn = document.getElementById("btnReplay");
+var scSel = document.getElementById("scSel"), fsBtn = document.getElementById("btnFs"), dlBtn = document.getElementById("dl");
+var stEl = document.getElementById("st");
+
+PLAN.forEach(function(p, i) {
+  var o = document.createElement("option");
+  o.value = p.start;
+  o.textContent = "Scene " + (i + 1) + ": " + (i === 0 ? "Laser Beam & Rainbow Spectrum Pull-Back" : "3D Ribbon N & Letter-by-Letter NH BOX Draw");
+  scSel.appendChild(o);
+});
+
+function playAt(offset) {
+  getAudioContext();
+  isPlaying = true;
+  pvBtn.textContent = "⏸ Pause";
+  stEl.textContent = "Status: Playing Spectrum + Letter-by-Letter Draw Intro...";
+  playStart = performance.now() - offset * 1000;
+  if (document.getElementById("sf").checked && actx && offset <= 0.1) {
+    scheduleNetflixAudio(actx, actx.currentTime - offset);
+  }
+  function loop() {
+    if (!isPlaying) return;
+    var t = (performance.now() - playStart) / 1000;
+    if (t >= TOTAL) { frameAt(TOTAL); stopPlay(); stEl.textContent = "Status: Completed."; return; }
+    frameAt(t);
+    rafId = requestAnimationFrame(loop);
+  }
+  if (rafId) cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(loop);
+}
+
+function stopPlay() {
+  isPlaying = false;
+  pvBtn.textContent = "▶ Preview Chalao";
+  if (rafId) cancelAnimationFrame(rafId);
+}
+
+pvBtn.onclick = function() { isPlaying ? stopPlay() : playAt(0); };
+replayBtn.onclick = function() { stopPlay(); playAt(5.15); }; // Jump right to the Letter-by-Letter Draw!
+scSel.onchange = function() { stopPlay(); playAt(parseFloat(this.value) || 0); };
+fsBtn.onclick = function() { !document.fullscreenElement ? cv.requestFullscreen() : document.exitFullscreen(); };
+dlBtn.onclick = function() {
+  stEl.textContent = "Status: Rendering 16-bit WAV...";
+  renderSfxWav(function(b) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(b);
+    a.download = "nh_box_netflix_letter_draw_sfx.wav";
+    a.click();
+    stEl.textContent = "Status: WAV Downloaded!";
+  });
+};
+
+// Initial poster frame showing the 3rd letter ('B') actively being laser-drawn with sparks!
+frameAt(6.35);
+</script>
+</body>
+</html>

@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NH BOX - Deep-Space Cyan Mainframe Crosshair Grid (5 Texts) (Ultra HD)</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#00040A; --panel:#0B0F19; --border:#222C44; --ac:#1E567A; --text:#F8FAFC; --muted:#94A3B8; box-sizing:border-box; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:16px 14px 36px; }
+.wrap { width:100%; max-width:1120px; display:flex; flex-direction:column; gap:12px; }
+.header { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
+.title-group h1 { font-size:20px; font-weight:900; display:flex; align-items:center; gap:10px; }
+.badge { background:#E50914; color:#fff; font-size:11px; font-weight:800; padding:3px 9px; border-radius:4px; letter-spacing:1px; }
+.desc { color:var(--muted); font-size:12.5px; margin-top:3px; }
+.canvas-holder { width:100%; background:#000; border-radius:12px; overflow:hidden; border:1px solid var(--border); box-shadow:0 20px 60px rgba(0,0,0,0.95); }
+canvas#cv { width:100%; height:auto; aspect-ratio:16/9; display:block; background:#000; }
+.controls-bar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; background:var(--panel); border:1px solid var(--border); padding:10px 14px; border-radius:10px; }
+.btn-cluster, .toggles { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+button, select { font:600 12.5px inherit; padding:8px 13px; border-radius:7px; border:1px solid #2d3858; background:#141a2e; color:#fff; cursor:pointer; }
+button.primary { background:#E50914; color:#fff; font-weight:800; border-color:#ff5258; }
+.toggles label { font-size:12px; color:var(--muted); display:flex; align-items:center; gap:5px; cursor:pointer; }
+.status-bar { display:flex; justify-content:space-between; font:12px ui-monospace,monospace; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div class="title-group">
+      <h1>NH BOX <span class="badge">DEEP-SPACE CYAN MAINFRAME CROSSHAIR GRID (5 TEXTS)</span></h1>
+      <p class="desc">Exact Match to Uploaded Video: 10-Row Alphanumeric/Binary Code Wall (`101ALL1STAR0BANK...`) with 5 Progressive White Credit Reveals.</p>
+    </div>
+  </div>
+  <div class="canvas-holder"><canvas id="cv" width="1920" height="1080"></canvas></div>
+  <div class="controls-bar">
+    <div class="btn-cluster">
+      <button id="pv" class="primary">▶ Preview Chalao</button>
+      <button id="btnReplay">⟲ Replay Sequence</button>
+      <select id="scSel"></select>
+      <button id="btnFs">⛶ Fullscreen</button>
+    </div>
+    <div class="toggles">
+      <label><input type="checkbox" id="cap"> Subtitles</label>
+      <label><input type="checkbox" id="sf" checked> Telemetry &amp; Decoder SFX</label>
+      <button id="dl">⬇ SFX Track (WAV)</button>
+    </div>
+  </div>
+  <div class="status-bar">
+    <span id="st">Status: Ready. Click Preview.</span>
+    <span id="timing">0.00s / 13.50s [60 FPS]</span>
+  </div>
+</div>
+
+<script>
+/* ==========================================================================
+   1. 5 CUSTOMIZABLE CREDIT TEXTS (MATCHING THE 3-ACT STRUCTURE OF THE VIDEO!)
+   ==========================================================================
+   - Act 1 (0.0s -> 4.3s):
+       Row 4: TEXT_1 ("A NH BOX ENTERTAINMENT COMPANY/")
+       Row 5: TEXT_2 ("LION ROCK")
+       Row 6: TEXT_3 ("PRODUCTION")
+   - Act 2 (4.4s -> 8.8s):
+       Row 4: TEXT_4 ("IN ASSOCIATION WITH")
+       Row 5: TEXT_2 ("NH BOX / HACKETT")
+       Row 6: TEXT_3 ("PRODUCTIONS")
+   - Act 3 (8.9s -> 13.5s):
+       Row 5: TEXT_5 ("A NH BOX FILM")
+   ========================================================================== */
+var BRAND_TEXT = "NH BOX";
+var TAGLINE_TEXT = "PRODUCTION";
+
+var TEXT_1 = "A NH BOX ENTERTAINMENT COMPANY/";
+var TEXT_2 = "LION ROCK";
+var TEXT_3 = "PRODUCTION";
+var TEXT_4 = "IN ASSOCIATION WITH";
+var TEXT_5 = "A NH BOX FILM";
+
+var STYLE_MODE = "CYAN_MAINFRAME";
+var BG_COL = "#00040A";
+var DIM_COL = "#1E567A";
+var GHOST_COL = "#0B2B40";
+var HI_COL = "#FFFFFF";
+var GLOW_COL = "rgba(0, 215, 255, 0.65)";
+var BASE_FREQ = 146.83;
+
+var SC = [
+  { "min": 4.4, "vo": "A NH BOX Entertainment Company, Lion Rock Production..." },
+  { "min": 4.4, "vo": "In association with NH BOX Productions..." },
+  { "min": 4.7, "vo": "A NH BOX Film." }
+];
+var S = SC;
+
+var cv = document.getElementById("cv"), c = cv.getContext("2d");
+var W = 1920, H = 1080, CX = 960, CY = 540;
+var cl = function(v, a, b) { return v < a ? a : v > b ? b : v; };
+var seg = function(t, a, b) { return cl((t - a) / (b - a), 0, 1); };
+var easeOutCubic = function(t) { t = cl(t, 0, 1); return 1 - Math.pow(1 - t, 3); };
+var easeInOutCubic = function(t) { t = cl(t, 0, 1); return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2; };
+
+var DUR = null, PLAN = [], TOTAL = 13.5;
+function buildPlan() {
+  PLAN = [
+    { i: 0, start: 0.0, len: 4.4, vd: 3.6, vs: 0.2 },
+    { i: 1, start: 4.4, len: 4.4, vd: 3.6, vs: 0.2 },
+    { i: 2, start: 8.8, len: 4.7, vd: 3.8, vs: 0.2 }
+  ];
+  TOTAL = 13.5;
+}
+buildPlan();
+
+var NH = {
+  lang: "hi-IN",
+  narration: function() { return JSON.stringify(SC.map(function(s) { return { a: s.vo, b: "" }; })); },
+  setDurations: function(j) {
+    try { DUR = typeof j === "string" ? JSON.parse(j) : j; } catch(e) {}
+    buildPlan();
+    return { total: TOTAL, events: PLAN.map(function(p, i) { return { time: p.start, scene: i, text: SC[i].vo }; }) };
+  },
+  run: function(fps) {
+    fps = fps || 60;
+    var N = Math.ceil(TOTAL * fps), n = 0;
+    function step() {
+      if (n >= N) { if (window.Android && window.Android.done) window.Android.done(); return; }
+      frameAt(n / fps);
+      if (window.Android && window.Android.pushFrame) {
+        try { window.Android.pushFrame(cv.toDataURL("image/jpeg", 0.92)); } catch(e) {}
+      }
+      if (window.Android && window.Android.progress) window.Android.progress(n, N);
+      n++;
+      requestAnimationFrame(step);
+    }
+    step();
+  }
+};
+window.NH = NH;
+window.bedSched = function() {};
+
+/* ==========================================================================
+   2. WEBAUDIO TELEMETRY DATA TICKS, BASS DRONE & DECODER LOCK SFX
+   ========================================================================== */
+var actx = null;
+function getAudioContext() {
+  if (!actx) { var AC = window.AudioContext || window.webkitAudioContext; if (AC) actx = new AC(); }
+  if (actx && actx.state === "suspended") actx.resume();
+  return actx;
+}
+
+function scheduleCodeGridAudio(ctx, baseTime) {
+  var master = ctx.createGain();
+  master.gain.setValueAtTime(0.88, baseTime);
+  master.connect(ctx.destination);
+
+  var comp = ctx.createDynamicsCompressor();
+  comp.threshold.setValueAtTime(-14, baseTime);
+  comp.ratio.setValueAtTime(5, baseTime);
+  comp.connect(master);
+
+  // 1. Rapid High-Tech Telemetry Computer Data Ticks across all 13.5 seconds
+  for (var tick = 0; tick < 110; tick++) {
+    var tTick = baseTime + tick * 0.12;
+    // Pause ticks briefly during dark transitions (3.9-4.4s and 8.2-8.8s)
+    var relT = tick * 0.12;
+    if ((relT > 3.85 && relT < 4.35) || (relT > 8.15 && relT < 8.75)) continue;
+
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = "sine";
+    var f = 1800 + ((tick * 433) % 1600);
+    o.frequency.setValueAtTime(f, tTick);
+    g.gain.setValueAtTime(0.0001, tTick);
+    g.gain.linearRampToValueAtTime(0.035, tTick + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, tTick + 0.028);
+    o.connect(g); g.connect(comp);
+    o.start(tTick); o.stop(tTick + 0.032);
+  }
+
+  // 2. 5 Credit Lock-In Sub-Bass Pulses & Crystalline Decoder Chimes
+  // Cue times when each of the 5 texts locks in:
+  // Text 1: 0.45s, Text 2: 0.95s, Text 3: 1.45s | Text 4: 4.65s, Text 2/3: 5.25s | Text 5: 9.15s
+  var lockCues = [
+    { t: 0.45, f: BASE_FREQ * 2.0, sub: 65.41 },
+    { t: 0.95, f: BASE_FREQ * 2.5, sub: 73.42 },
+    { t: 1.45, f: BASE_FREQ * 3.0, sub: 55.00 },
+    { t: 4.65, f: BASE_FREQ * 2.25, sub: 65.41 },
+    { t: 5.25, f: BASE_FREQ * 3.0, sub: 55.00 },
+    { t: 9.15, f: BASE_FREQ * 4.0, sub: 49.00 }
+  ];
+
+  lockCues.forEach(function(cue) {
+    var tc = baseTime + cue.t;
+    // Deep cinema sub-bass thump
+    var sub = ctx.createOscillator(), sg = ctx.createGain();
+    sub.type = "sine";
+    sub.frequency.setValueAtTime(cue.sub * 1.6, tc);
+    sub.frequency.exponentialRampToValueAtTime(cue.sub, tc + 0.22);
+    sg.gain.setValueAtTime(0.65, tc);
+    sg.gain.exponentialRampToValueAtTime(0.0001, tc + 1.8);
+    sub.connect(sg); sg.connect(comp);
+    sub.start(tc); sub.stop(tc + 1.9);
+
+    // Suspenseful thriller synth pad swell
+    [1.0, 1.5, 2.0].forEach(function(m, idx) {
+      var p = ctx.createOscillator(), flt = ctx.createBiquadFilter(), pg = ctx.createGain();
+      p.type = idx === 0 ? "sawtooth" : "triangle";
+      p.frequency.setValueAtTime(cue.f * m * 0.5, tc);
+      flt.type = "lowpass"; flt.frequency.setValueAtTime(950, tc);
+      var v = 0.08 / (1 + idx * 0.3);
+      pg.gain.setValueAtTime(0.0001, tc);
+      pg.gain.linearRampToValueAtTime(v, tc + 0.08);
+      pg.gain.exponentialRampToValueAtTime(0.0001, tc + 2.2);
+      p.connect(flt); flt.connect(pg); pg.connect(comp);
+      p.start(tc); p.stop(tc + 2.3);
+    });
+  });
+}
+
+function renderSfxWav(cb) {
+  var off = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(2, Math.ceil(44100 * TOTAL), 44100);
+  scheduleCodeGridAudio(off, 0);
+  off.startRendering().then(function(buf) {
+    var numOfChan = buf.numberOfChannels, len = buf.length * numOfChan * 2 + 44;
+    var out = new DataView(new ArrayBuffer(len)), ch = [], pos = 0, offset = 0;
+    function u16(d) { out.setUint16(pos, d, true); pos += 2; }
+    function u32(d) { out.setUint32(pos, d, true); pos += 4; }
+    u32(0x46464952); u32(len - 8); u32(0x45564157); u32(0x20746d66); u32(16); u16(1); u16(numOfChan);
+    u32(buf.sampleRate); u32(buf.sampleRate * 2 * numOfChan); u16(numOfChan * 2); u16(16); u32(0x61746164); u32(len - pos - 4);
+    for (var i = 0; i < numOfChan; i++) ch.push(buf.getChannelData(i));
+    while (offset < buf.length) {
+      for (var cIdx = 0; cIdx < numOfChan; cIdx++) {
+        var s = Math.max(-1, Math.min(1, ch[cIdx][offset]));
+        out.setInt16(pos, (s < 0 ? s * 32768 : s * 32767) | 0, true); pos += 2;
+      }
+      offset++;
+    }
+    cb(new Blob([out], { type: "audio/wav" }));
+  });
+}
+
+/* ==========================================================================
+   3. EXACT ALPHANUMERIC / BINARY CODE MATRIX WALL GENERATOR
+   Matches the exact strings visible in the user's video:
+   "101ALL1STAR0BANK01WRITTEN01PRODUCTION011USE01MAGNIFYING1SWIPE1CARD01LARGE..."
+   ========================================================================== */
+var CODE_VOCAB = [
+  "101ALL1STAR0BANK01WRITTEN01PRODUCTION0110110",
+  "USE01MAGNIFYING1SWIPE1CARD01LARGE0111001LENS",
+  "NOTE01SILVER010DOLLAR01000GREEN00LENS1WISEMA",
+  "MOND01ENGAGEMENT0101BEN1AND10AFFLECK101AEROS",
+  "01GEORGARIS000101000UPON0THE0100SHORT1000STO",
+  "LIP1K0DICK10SCREENPLAY10100DAVIS10101MICHAEL",
+  "TERENCE11CHANG011BASED1011STRATTON0LEOPOLD11",
+  "PRODUCED1101BY1011JOHNMAN111PAUL100GIAMATTI0",
+  "HN11WOO010JOFILMMORTON1110111011CHAIN1WORD01",
+  "MPTY1MATCHBOX01WISE00WILLIAM0GREGORY1LIMC101",
+  "VIN1STITT11ACE10CHRISTOPHER1A0LIFE1DIAMOND01",
+  "1101RING10BULLET111SWIPE1CARD0110TUBE00BALL1"
+];
+
+var ROWS = 10;
+var COLS = 50; // 50 monospace characters across 1920px
+var CHAR_W = 37.5;
+var ROW_H = 66;
+var GRID_TOP_Y = 210; // Centered 10-row block with black cinema letterbox top/bottom
+
+function getMatrixBackgroundChar(row, col, T, layerOffset) {
+  // Rapidly shifts/cycles characters horizontally and mutates binary digits like a live decryption buffer
+  var speed = (row % 2 === 0 ? 1 : -1) * (1.8 + (row % 3) * 0.9);
+  var shiftedCol = Math.floor(col + T * speed + layerOffset * 7);
+  var lineStr = CODE_VOCAB[(row + layerOffset) % CODE_VOCAB.length];
+  var ch = lineStr[((shiftedCol % lineStr.length) + lineStr.length) % lineStr.length];
+
+  // Occasional high-speed binary/letter flicker
+  var hash = Math.sin(row * 19.1 + col * 37.7 + Math.floor(T * 18) * 11.3) * 10000;
+  hash -= Math.floor(hash);
+  if (hash > 0.86) {
+    var pool = "010101ABCDEFGHJKLMNPQRSTUVWXYZ/$#";
+    ch = pool[Math.floor(hash * 100) % pool.length];
+  }
+  return ch;
+}
+
+/**
+ * Renders the 10-row Alphanumeric Code Wall and locks in the active White Credit Lines (`activeCredits`).
+ * Each entry in `activeCredits` is:
+ *   `{ row: 3..5, col: startCol, text: String, tIn: sec, tOut: sec }`
+ */
+function renderCodeMatrixStage(T, wallIntensity, activeCredits) {
+  c.fillStyle = BG_COL;
+  c.fillRect(0, 0, W, H);
+
+  var fontSpec = "600 42px 'Share Tech Mono', 'JetBrains Mono', 'Courier New', monospace";
+  c.font = fontSpec;
+  c.textAlign = "center";
+  c.textBaseline = "middle";
+
+  // Build lookup map of locked credit characters at (row, col)
+  var lockedMap = {};
+  activeCredits.forEach(function(cr) {
+    if (T < cr.tIn || T > cr.tOut) return;
+    var str = cr.text;
+    var enterP = seg(T, cr.tIn, cr.tIn + 0.65);
+    var exitP = seg(T, cr.tOut - 0.50, cr.tOut);
+
+    for (var i = 0; i < str.length; i++) {
+      var charCol = cr.col + i;
+      if (charCol < 0 || charCol >= COLS) continue;
+      // Staggered left-to-right per-character decryption lock!
+      var charDelay = (i / Math.max(1, str.length)) * 0.45;
+      var cIn = cl((enterP - charDelay * 0.6) / 0.45, 0, 1);
+      var cAlpha = cIn * (1 - exitP);
+      if (cAlpha > 0.01) {
+        lockedMap[cr.row + ":" + charCol] = {
+          ch: str[i],
+          lockP: cIn,
+          alpha: cAlpha
+        };
+      }
+    }
+  });
+
+  // Render all 10 rows x 50 columns
+  for (var r = 0; r < ROWS; r++) {
+    var py = GRID_TOP_Y + r * ROW_H;
+
+    // Row reveal wave during transitions
+    var rowWave = cl(wallIntensity * 1.3 - Math.abs(r - 4.5) * 0.08, 0, 1);
+    if (rowWave <= 0.01) continue;
+
+    for (var col = 0; col < COLS; col++) {
+      var px = 22 + col * CHAR_W;
+      var key = r + ":" + col;
+      var locked = lockedMap[key];
+
+      // 1. Overlapping Ghost Double-Vision Code Layer (matches the blurred/double-exposed look in 00:00-00:06 of video!)
+      var ghostCh = getMatrixBackgroundChar(r, col, T, 3);
+      c.fillStyle = GHOST_COL;
+      c.globalAlpha = rowWave * 0.52;
+      c.fillText(ghostCh, px + 7, py - 2);
+
+      // 2. Primary Background Code Character
+      var bgCh = getMatrixBackgroundChar(r, col, T, 0);
+      if (!locked) {
+        var flicker = 0.65 + 0.35 * Math.sin(T * 8 + r * 3 + col * 5);
+        c.fillStyle = DIM_COL;
+        c.globalAlpha = rowWave * flicker * 0.85;
+        c.fillText(bgCh, px, py);
+      } else {
+        // 3. Highlighted White Credit Character Decryption & Lock-In!
+        if (locked.lockP < 0.65) {
+          // Rapidly scrambling cipher character right before locking into the final white letter
+          var scramblePool = "01X#9$K7M2W4";
+          var scrCh = scramblePool[Math.floor(T * 45 + col * 7) % scramblePool.length];
+          c.fillStyle = HI_COL;
+          c.globalAlpha = locked.alpha * 0.85;
+          c.fillText(scrCh, px, py);
+        } else {
+          // Locked stark white credit character with subtle optical bloom!
+          c.save();
+          c.font = "700 43px 'Share Tech Mono', 'JetBrains Mono', 'Courier New', monospace";
+          c.shadowColor = GLOW_COL;
+          c.shadowBlur = 16;
+          c.fillStyle = HI_COL;
+          c.globalAlpha = locked.alpha;
+          c.fillText(locked.ch, px, py);
+          c.restore();
+        }
+      }
+    }
+  }
+  c.globalAlpha = 1.0;
+
+  // Optional Subtle Scanline & Cinema Letterbox Bars (top and bottom black bars like the video)
+  c.fillStyle = "#000000";
+  c.fillRect(0, 0, W, 145);
+  c.fillRect(0, H - 145, W, 145);
+}
+
+/* ==========================================================================
+   4. MASTER 3-ACT TIMELINE FRAME RENDERER: frameAt(T) (0.0s -> 13.5s)
+   ========================================================================== */
+function frameAt(T) {
+  // Keep TEXT_1..TEXT_5 synced if BRAND_TEXT or TAGLINE_TEXT was updated dynamically
+  var activeCredits = [
+    // --- ACT 1 (0.15s -> 3.95s): 3-Line Staggered Production Credit (00:00 - 00:03 of video) ---
+    // Row 3: "A DAVIS ENTERTAINMENT COMPANY/" -> TEXT_1
+    { row: 3, col: Math.max(2, Math.floor((COLS - TEXT_1.length) * 0.36)), text: TEXT_1, tIn: 0.20, tOut: 3.85 },
+    // Row 4: "LION ROCK" -> TEXT_2
+    { row: 4, col: Math.max(4, Math.floor((COLS - TEXT_2.length) * 0.48)), text: TEXT_2, tIn: 0.70, tOut: 3.90 },
+    // Row 5: "PRODUCTION" -> TEXT_3
+    { row: 5, col: Math.max(6, Math.floor((COLS - TEXT_3.length) * 0.68)), text: TEXT_3, tIn: 1.20, tOut: 3.95 },
+
+    // --- ACT 2 (4.45s -> 8.25s): "IN ASSOCIATION WITH" + Company Stack (00:03 - 00:07 of video) ---
+    // Row 3: "IN ASSOCIATION WITH" -> TEXT_4
+    { row: 3, col: Math.max(2, Math.floor((COLS - TEXT_4.length) * 0.24)), text: TEXT_4, tIn: 4.45, tOut: 8.15 },
+    // Row 4: Partner Studio -> TEXT_2
+    { row: 4, col: Math.max(4, Math.floor((COLS - TEXT_2.length) * 0.56)), text: TEXT_2, tIn: 5.05, tOut: 8.20 },
+    // Row 5: "PRODUCTIONS" -> TEXT_3
+    { row: 5, col: Math.max(6, Math.floor((COLS - TEXT_3.length) * 0.62)), text: TEXT_3, tIn: 5.45, tOut: 8.25 },
+
+    // --- ACT 3 (8.90s -> 13.10s): Centered Director / Brand Film Credit "A JOHN WOO FILM" -> TEXT_5 (00:08 - 00:13 of video) ---
+    { row: 4, col: Math.max(2, Math.floor((COLS - TEXT_5.length) * 0.50)), text: TEXT_5, tIn: 8.95, tOut: 12.85 }
+  ];
+
+  // Background Code Wall Intensity (briefly dips during Act 1->2 at 4.1s and Act 2->3 at 8.5s, just like 00:03 & 00:07 of video!)
+  var wallIntensity = 1.0;
+  if (T > 3.70 && T < 4.55) {
+    wallIntensity = 0.25 + 0.75 * Math.abs(T - 4.12) / 0.43;
+  } else if (T > 8.05 && T < 8.95) {
+    wallIntensity = 0.18 + 0.82 * Math.abs(T - 8.50) / 0.45;
+  } else if (T > 12.60) {
+    wallIntensity = 1 - seg(T, 12.60, 13.45);
+  }
+
+  renderCodeMatrixStage(T, cl(wallIntensity, 0, 1), activeCredits);
+
+  var te = document.getElementById("timing");
+  if (te) te.textContent = T.toFixed(2) + "s / " + TOTAL.toFixed(2) + "s [60 FPS]";
+}
+
+/* ==========================================================================
+   5. UI CONTROLS
+   ========================================================================== */
+var isPlaying = false, playStart = 0, rafId = null;
+var pvBtn = document.getElementById("pv"), replayBtn = document.getElementById("btnReplay");
+var scSel = document.getElementById("scSel"), fsBtn = document.getElementById("btnFs"), dlBtn = document.getElementById("dl");
+var stEl = document.getElementById("st");
+
+PLAN.forEach(function(p, i) {
+  var o = document.createElement("option");
+  o.value = p.start;
+  o.textContent = "Act " + (i + 1) + ": " + (i === 0 ? "Text 1, 2 & 3 Code Lockup" : (i === 1 ? "Text 4 Association Lockup" : "Text 5 Main Film Credit"));
+  scSel.appendChild(o);
+});
+
+function playAt(offset) {
+  getAudioContext();
+  isPlaying = true;
+  pvBtn.textContent = "⏸ Pause";
+  stEl.textContent = "Status: Playing 5-Text Code-Grid Intro...";
+  playStart = performance.now() - offset * 1000;
+  if (document.getElementById("sf").checked && actx && offset <= 0.1) {
+    scheduleCodeGridAudio(actx, actx.currentTime - offset);
+  }
+  function loop() {
+    if (!isPlaying) return;
+    var t = (performance.now() - playStart) / 1000;
+    if (t >= TOTAL) { frameAt(TOTAL); stopPlay(); stEl.textContent = "Status: Completed."; return; }
+    frameAt(t);
+    rafId = requestAnimationFrame(loop);
+  }
+  if (rafId) cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(loop);
+}
+
+function stopPlay() {
+  isPlaying = false;
+  pvBtn.textContent = "▶ Preview Chalao";
+  if (rafId) cancelAnimationFrame(rafId);
+}
+
+pvBtn.onclick = function() { isPlaying ? stopPlay() : playAt(0); };
+replayBtn.onclick = function() { stopPlay(); playAt(0); };
+scSel.onchange = function() { stopPlay(); playAt(parseFloat(this.value) || 0); };
+fsBtn.onclick = function() { !document.fullscreenElement ? cv.requestFullscreen() : document.exitFullscreen(); };
+dlBtn.onclick = function() {
+  stEl.textContent = "Status: Rendering 16-bit WAV...";
+  renderSfxWav(function(b) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(b);
+    a.download = "tpl29_neon_cyan_mainframe_5text_sfx.wav";
+    a.click();
+    stEl.textContent = "Status: WAV Downloaded!";
+  });
+};
+
+// Initial poster frame showing Act 1 with Text 1, Text 2, and Text 3 locked in white over the code matrix!
+frameAt(2.10);
+</script>
+</body>
+</html>
